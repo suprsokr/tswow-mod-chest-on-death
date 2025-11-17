@@ -1,6 +1,7 @@
 import { registerCreatureDeathHandler } from './handlers/creatureDeathHandler';
 import { registerPlayerDeathHandler } from './handlers/playerDeathHandler';
 import { ChestOnDeathCreatureConfig, ChestOnDeathPlayerConfig } from './shared/config';
+import { registerChestOwner, registerChestPermissions } from './shared/chestPermissions';
 
 export function Main(events: TSEvents) {
     console.log("[chest-on-death] Module loaded - chest spawning enabled");
@@ -9,7 +10,7 @@ export function Main(events: TSEvents) {
     const creatureConfig: ChestOnDeathCreatureConfig = {
         USE_CREATURE_LOOT: true,
         CHEST_ONLY_LOOT: true,
-        OWNER_ONLY_LOOT: true,
+        LOOT_OWNERSHIP: 'owner-and-group',   // Killer and group can loot
         SPAWN_EMPTY_CHESTS: false,
         INCLUDE_QUEST_ITEMS: true,
         CHEST_DESPAWN_TIME: 300, // 5 minutes
@@ -19,7 +20,7 @@ export function Main(events: TSEvents) {
     const playerConfig: ChestOnDeathPlayerConfig = {
         ENABLE_PLAYER_DEATH_CHEST: true,
         USE_PLAYER_ITEMS: true,              // Use player items (vs. chest loot table)
-        PLAYER_CHEST_OWNER_ONLY: true,
+        LOOT_OWNERSHIP: 'owner-only',        // Only dead player can loot
         REMOVE_PLAYER_ITEMS_ON_DEATH: true,
         PLAYER_CHEST_DESPAWN_TIME: 600,      // 10 minutes
         
@@ -38,7 +39,13 @@ export function Main(events: TSEvents) {
         MONEY_DROP_MAX_STATIC: -1,           // -1 = no cap on money dropped
     };
     
-    // Register event handlers
-    registerCreatureDeathHandler(events, creatureConfig);
-    registerPlayerDeathHandler(events, playerConfig);
+    // Get the chest entry ID (compile-time macro)
+    const chestEntryId = UTAG('chest-on-death', 'loot-chest');
+    
+    // Register chest permission checking
+    registerChestPermissions(events, chestEntryId);
+    
+    // Register event handlers with ownership tracking
+    registerCreatureDeathHandler(events, creatureConfig, registerChestOwner);
+    registerPlayerDeathHandler(events, playerConfig, registerChestOwner);
 }

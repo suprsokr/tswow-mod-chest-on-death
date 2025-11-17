@@ -3,6 +3,14 @@
  */
 
 /**
+ * Loot ownership modes
+ */
+export type LootOwnershipMode = 
+    | 'free-for-all'      // Anyone can loot
+    | 'owner-only'        // Only the owner (killer/dead player) can loot
+    | 'owner-and-group';  // Owner and their group members can loot
+
+/**
  * Configuration for creature death chest spawning
  */
 export interface ChestOnDeathCreatureConfig {
@@ -14,9 +22,11 @@ export interface ChestOnDeathCreatureConfig {
     // If false, creatures drop loot normally AND spawn a chest with loot
     CHEST_ONLY_LOOT: boolean;
     
-    // If true, only the killer (and their group) can loot the chest
-    // If false, anyone can loot the chest (free-for-all)
-    OWNER_ONLY_LOOT: boolean;
+    // Who can loot the chest
+    // 'free-for-all': Anyone can loot
+    // 'owner-only': Only the killer can loot
+    // 'owner-and-group': Killer and their group members can loot
+    LOOT_OWNERSHIP: LootOwnershipMode;
     
     // If true, spawn chests even when creatures have no loot
     // If false, only spawn chests when there's loot to transfer
@@ -41,9 +51,11 @@ export interface ChestOnDeathPlayerConfig {
     // If false, use chest's loot table defined in datascript (ignores player items)
     USE_PLAYER_ITEMS: boolean;
     
-    // If true, only the dead player can loot their death chest
-    // If false, anyone can loot the player's death chest
-    PLAYER_CHEST_OWNER_ONLY: boolean;
+    // Who can loot the player's death chest
+    // 'free-for-all': Anyone can loot
+    // 'owner-only': Only the dead player can loot
+    // 'owner-and-group': Dead player and their group members can loot
+    LOOT_OWNERSHIP: LootOwnershipMode;
     
     // If true, remove items from player inventory on death (they must reclaim from chest)
     // If false, items stay in player inventory (chest has copies)

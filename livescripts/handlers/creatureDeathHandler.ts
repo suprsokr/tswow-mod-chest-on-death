@@ -2,15 +2,19 @@ import { ChestOnDeathCreatureConfig } from '../shared/config';
 import { 
     spawnChest, 
     initializeChestLoot, 
-    setLootOwner, 
     addRegularItemToLoot, 
     addQuestItemToLoot 
 } from '../shared/utilities';
+import { RegisterChestOwnerCallback } from '../shared/chestPermissions';
 
 /**
  * Handles creature death and spawns loot chests
  */
-export function registerCreatureDeathHandler(events: TSEvents, config: ChestOnDeathCreatureConfig): void {
+export function registerCreatureDeathHandler(
+    events: TSEvents, 
+    config: ChestOnDeathCreatureConfig,
+    registerChestOwner: RegisterChestOwnerCallback
+): void {
     // Use OnGenerateLoot instead of OnDeath to properly access creature loot
     // This event fires after loot is generated but before it's shown to players
     events.Creature.OnGenerateLoot((creature, killer) => {
@@ -51,9 +55,9 @@ export function registerCreatureDeathHandler(events: TSEvents, config: ChestOnDe
         
         // Handle loot based on USE_CREATURE_LOOT setting
         if (config.USE_CREATURE_LOOT) {
-            handleCreatureLootMode(creature, chest, killer || null, config);
+            handleCreatureLootMode(creature, chest, killer || null, config, registerChestOwner);
         } else {
-            handleChestLootTableMode(creature, chest, killer || null, config);
+            handleChestLootTableMode(creature, chest, killer || null, config, registerChestOwner);
         }
     });
 }
@@ -65,7 +69,8 @@ function handleCreatureLootMode(
     creature: TSCreature, 
     chest: TSGameObject, 
     killer: TSPlayer | null,
-    config: ChestOnDeathCreatureConfig
+    config: ChestOnDeathCreatureConfig,
+    registerChestOwner: RegisterChestOwnerCallback
 ): void {
     const creatureLoot = creature.GetLoot();
     const chestLoot = chest.GetLoot();
@@ -73,13 +78,15 @@ function handleCreatureLootMode(
     // Initialize chest loot
     initializeChestLoot(chestLoot);
     
-    // Set loot owner BEFORE adding items (required for AddItem() to work correctly)
-    if (config.OWNER_ONLY_LOOT && killer) {
+    // Register chest ownership for permission checking
+    if (killer) {
         const killerPlayer = killer.ToPlayer();
-        if (killerPlayer) {
-            setLootOwner(chestLoot, killerPlayer.GetGUID());
+        if (killerPlayer && !killerPlayer.IsNull()) {
+            registerChestOwner(chest, killerPlayer, config.LOOT_OWNERSHIP);
         }
     }
+    // Note: If no killer or killer is not a player, chest will have no ownership data
+    // and will default to 'free-for-all' in the permission check
     
     // Copy money from creature to chest
     const money = creatureLoot.GetMoney();
@@ -118,16 +125,18 @@ function handleChestLootTableMode(
     creature: TSCreature, 
     chest: TSGameObject, 
     killer: TSPlayer | null,
-    config: ChestOnDeathCreatureConfig
+    config: ChestOnDeathCreatureConfig,
+    registerChestOwner: RegisterChestOwnerCallback
 ): void {
-    // Optionally set loot owner for the chest
-    if (config.OWNER_ONLY_LOOT && killer) {
+    // Register chest ownership for permission checking
+    if (killer) {
         const killerPlayer = killer.ToPlayer();
-        if (killerPlayer) {
-            const chestLoot = chest.GetLoot();
-            setLootOwner(chestLoot, killerPlayer.GetGUID());
+        if (killerPlayer && !killerPlayer.IsNull()) {
+            registerChestOwner(chest, killerPlayer, config.LOOT_OWNERSHIP);
         }
     }
+    // Note: If no killer or killer is not a player, chest will have no ownership data
+    // and will default to 'free-for-all' in the permission check
     
     // Clear creature body if CHEST_ONLY_LOOT is enabled
     if (config.CHEST_ONLY_LOOT) {

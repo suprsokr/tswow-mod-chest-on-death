@@ -8,9 +8,9 @@ import {
 import { 
     spawnChest, 
     initializeChestLoot, 
-    setLootOwner, 
     addRegularItemToLoot 
 } from '../shared/utilities';
+import { RegisterChestOwnerCallback } from '../shared/chestPermissions';
 
 interface ItemData {
     itemId: number;
@@ -21,7 +21,11 @@ interface ItemData {
 /**
  * Handles player death and spawns loot chests containing their items
  */
-export function registerPlayerDeathHandler(events: TSEvents, config: ChestOnDeathPlayerConfig): void {
+export function registerPlayerDeathHandler(
+    events: TSEvents, 
+    config: ChestOnDeathPlayerConfig,
+    registerChestOwner: RegisterChestOwnerCallback
+): void {
     if (!config.ENABLE_PLAYER_DEATH_CHEST) {
         return;
     }
@@ -53,9 +57,9 @@ export function registerPlayerDeathHandler(events: TSEvents, config: ChestOnDeat
         
         // Handle loot based on USE_PLAYER_ITEMS setting
         if (config.USE_PLAYER_ITEMS) {
-            handlePlayerItemsMode(player, chest, config);
+            handlePlayerItemsMode(player, chest, config, registerChestOwner);
         } else {
-            handleChestLootTableMode(player, chest, config);
+            handleChestLootTableMode(player, chest, config, registerChestOwner);
         }
     });
 }
@@ -63,7 +67,12 @@ export function registerPlayerDeathHandler(events: TSEvents, config: ChestOnDeat
 /**
  * MODE 1: Use player's items for chest loot (with filtering/selection)
  */
-function handlePlayerItemsMode(player: TSPlayer, chest: TSGameObject, config: ChestOnDeathPlayerConfig): void {
+function handlePlayerItemsMode(
+    player: TSPlayer, 
+    chest: TSGameObject, 
+    config: ChestOnDeathPlayerConfig,
+    registerChestOwner: RegisterChestOwnerCallback
+): void {
     // Collect items and money
     const { itemsToTransfer, itemsToRemove, money } = collectPlayerItems(player, config);
     
@@ -73,6 +82,9 @@ function handlePlayerItemsMode(player: TSPlayer, chest: TSGameObject, config: Ch
         chest.Despawn();
         return;
     }
+    
+    // Register chest ownership for permission checking
+    registerChestOwner(chest, player, config.LOOT_OWNERSHIP);
     
     // Setup chest loot
     setupPlayerDeathChestLoot(chest, player, itemsToTransfer, money, config);
@@ -89,12 +101,14 @@ function handlePlayerItemsMode(player: TSPlayer, chest: TSGameObject, config: Ch
  * MODE 2: Use chest's own loot table (from datascript)
  * Player keeps all their items, chest spawns with static loot
  */
-function handleChestLootTableMode(player: TSPlayer, chest: TSGameObject, config: ChestOnDeathPlayerConfig): void {
-    // Optionally set loot owner for the chest
-    if (config.PLAYER_CHEST_OWNER_ONLY) {
-        const chestLoot = chest.GetLoot();
-        setLootOwner(chestLoot, player.GetGUID());
-    }
+function handleChestLootTableMode(
+    player: TSPlayer, 
+    chest: TSGameObject, 
+    config: ChestOnDeathPlayerConfig,
+    registerChestOwner: RegisterChestOwnerCallback
+): void {
+    // Register chest ownership for permission checking
+    registerChestOwner(chest, player, config.LOOT_OWNERSHIP);
     
     console.log(`[chest-on-death] Death chest spawned for player ${player.GetName()} using chest loot table`);
 }
@@ -261,10 +275,8 @@ function setupPlayerDeathChestLoot(
     // Initialize chest loot
     initializeChestLoot(chestLoot);
     
-    // Set loot owner to the dead player
-    if (config.PLAYER_CHEST_OWNER_ONLY) {
-        setLootOwner(chestLoot, player.GetGUID());
-    }
+    // Note: Ownership is handled by registerChestOwner() in the calling function
+    // using GameObject data tags, not setLootOwner() which doesn't work for chests
     
     // Add player's money to chest
     if (money > 0) {
